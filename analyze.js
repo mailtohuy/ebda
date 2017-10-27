@@ -31,7 +31,7 @@ if (process.argv[2] == undefined) {
 	.then(format final results)
 */
 
-function find_client_by_product(data, this_product) {
+function find_clients_by_product(data, this_product) {
 	/* this_product must have at least one of {category, registration, type, code, fullName} */
 	let clients_with_this_product = _.chain(data)
 					.map( card => _.chain(card.accounts)
