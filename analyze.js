@@ -13,17 +13,17 @@ if (process.argv[2] == undefined) {
 	.then(transform_data)
 	// .then(list_all_products)	/* list all account types in the data set */
 	.then(data=>find_clients_by_product(data, {type: 'SAVINGS'}))
-	// .then(data=>find_clients_with_this_product(data, {fullName: 'CARDMXAVW'}))	/* Aventura type: MXAVW */
-	// .then(data=>find_clients_with_this_product(data, {registration: 'TFSA'})) /* find_clients_with_tfsa */
-	// .then(data=>find_clients_with_this_product(data, {type: 'MORTGAGE'})) /* find_clients_with_mortgage */
-	// .then(data=>find_clients_with_this_product(data, {type: 'PERSONAL_LINE_CREDIT'})) /* find_clients_with_plc */
-	// .then(data=>find_clients_with_this_product(data, {type: 'LOAN'})) /* find_clients_with_loan */
+	// .then(data=>find_clients_by_product(data, {fullName: 'CARDMXAVW'}))	/* Aventura type: MXAVW */
+	// .then(data=>find_clients_by_product(data, {registration: 'TFSA'})) /* find_clients_with_tfsa */
+	// .then(data=>find_clients_by_product(data, {type: 'MORTGAGE'})) /* find_clients_with_mortgage */
+	// .then(data=>find_clients_by_product(data, {type: 'PERSONAL_LINE_CREDIT'})) /* find_clients_with_plc */
+	// .then(data=>find_clients_by_product(data, {type: 'LOAN'})) /* find_clients_with_loan */
 	// .then(find_small_business_clients)
 	.then(console.log);
 }
 
 /* TODO
-1. Refactor other find_* functions to use find_clients_with_this_product?
+1. Refactor other find_* functions to use find_clients_by_product?
 2. Find a way for all find_* functions to return the same data structure, so that I can do 
 	read_data(file).then(transform_data)
 	.then(find something)
