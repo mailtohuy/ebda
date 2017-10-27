@@ -1,3 +1,4 @@
+/*eslint-disable no-unused-vars */
 var fs = require("fs"),
 	_ = require("underscore"),
 	data_file = "./" + process.argv[2],
@@ -11,9 +12,58 @@ if (process.argv[2] == undefined) {
 	read_data(data_file)
 	.then(transform_data)
 	// .then(list_all_products)	/* list all account types in the data set */
-	.then(find_clients_for_payment_with_point)
-	.then(console.log)
-	;
+	.then(data=>find_clients_by_product(data, {type: 'SAVINGS'}))
+	// .then(data=>find_clients_with_this_product(data, {fullName: 'CARDMXAVW'}))	/* Aventura type: MXAVW */
+	// .then(data=>find_clients_with_this_product(data, {registration: 'TFSA'})) /* find_clients_with_tfsa */
+	// .then(data=>find_clients_with_this_product(data, {type: 'MORTGAGE'})) /* find_clients_with_mortgage */
+	// .then(data=>find_clients_with_this_product(data, {type: 'PERSONAL_LINE_CREDIT'})) /* find_clients_with_plc */
+	// .then(data=>find_clients_with_this_product(data, {type: 'LOAN'})) /* find_clients_with_loan */
+	// .then(find_small_business_clients)
+	.then(console.log);
+}
+
+/* TODO
+1. Refactor other find_* functions to use find_clients_with_this_product?
+2. Find a way for all find_* functions to return the same data structure, so that I can do 
+	read_data(file).then(transform_data)
+	.then(find something)
+	.then(find something from above results)
+	.then(format final results)
+*/
+
+function find_client_by_product(data, this_product) {
+	/* this_product must have at least one of {category, registration, type, code, fullName} */
+	let clients_with_this_product = _.chain(data)
+					.map( card => _.chain(card.accounts)
+					.map(account => _.defaults(account, {'accessCard' : card.card, 'clientSegment' : card.segment }))
+					.value() )
+					.flatten()
+					.map(account => _.chain(account)
+						.omit('_type', 'external', 'displayAttributes')
+						.value())
+					.filter(acct => _.isMatch(acct.product, this_product))
+					// .pluck('accessCard')
+					// .uniq()
+					.value();
+	return clients_with_this_product;
+	/* Return:
+		{ id: 'c487bd85d',
+		  number: '6606947601',
+		  nickname: '',
+		  capabilities: [ 'RENAMEABLE', 'MARVEL_TO_ASR' ],
+		  product: { category: 'CREDIT', registration: 'NON_REGISTERED', type: 'LOAN', code: 'CL', name: 'CL', fullName: 'CLCL@', bankDesignation: null },
+		  availableFunds: { currency: 'CAD', amount: 6737.06 },
+		  balance: { currency: 'CAD', amount: 6737.06 },
+		  transit: '00002',
+		  status: 'ACTIVE',
+		  details: null,
+		  accessCard: '4506445090048743',
+		  clientSegment: 'PERSONAL_BANKING' 
+		  // _type: 'InternalAccount',		  
+		  // external: false,
+		  // displayAttributes: null,		  
+		}	
+	*/	
 }
 
 function find_clients_for_payment_with_point(data) {
@@ -147,7 +197,7 @@ function find_clients_with_usd_acct(data) {
 		.pick('id', 'card', 'status', 'transit', 'number', 'balance', 'availableFunds' , 'capabilities')
 		.defaults({'registration': account.product.registration, 'type': account.product.type})
 		.value())
-	.filter(acct => acct.balance && acct.balance.currency == 'USD')
+	.filter(acct => acct.balance && acct.balance.currency === 'USD')
 	.map(acct => _.pick(acct, 'card', 'transit', 'number', 'type', 'balance'))	
 	// .groupBy('card')
 	.value();
@@ -176,7 +226,7 @@ function find_not_registered_emt(data) {
 	var emt_register = _.chain(data)
 	.filter( card => _.contains(card.entitlements, 'EMT_REGISTER') )
 	.pluck('card')
-	.value()
+	.value();
 	
 	return emt_register;
 }
@@ -238,7 +288,7 @@ function group_card_by_segments(data) {
 } 
 
 function read_data(data_file) {
-	return (new Promise((resolve, reject)=>{
+	return new Promise((resolve, reject)=>{
 		fs.readFile(data_file, "utf8",(error, content)=>{
 			if (error) {
 				console.log(error);
@@ -247,11 +297,11 @@ function read_data(data_file) {
 				resolve(content);
 			}
 		});	
-	}));
+	});
 }
 
 function transform_data(data) {
-	return (new Promise((resolve, reject)=>{
+	return new Promise((resolve, reject)=>{
 		var json = JSON.parse(data);
 		var good_cards = _.chain(json)
 		.values() /* keep only values */
@@ -315,7 +365,7 @@ function transform_data(data) {
 				} ]
 			} 
 		*/		
-	}));
+	});
 }
 
 
