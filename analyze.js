@@ -1,9 +1,12 @@
-/*eslint-disable no-unused-vars */
-var fs = require("fs"),
-	_ = require("underscore"),
-	data_file = "./" + process.argv[2],
+const fs = require("fs");
+const _ = require("underscore");
+var	data_file = "./" + process.argv[2],
 	data; // [ 'card#' : { card: card# , [x-auth-token|error]: ... , data: [ {resp 1}, {resp 2}] } ]
 
+const marvel_eligible_cards = ['MXAVW', 'MXAVW', 'MXAPW', 'MXAPW', 'MCPLP', 'MCPLT', 'MCPLR'];	
+	
+	
+	
 if (process.argv[2] == undefined) {
 	console.log('Enter a data file');
 	process.exit();
@@ -11,41 +14,109 @@ if (process.argv[2] == undefined) {
 } else {
 	read_data(data_file)
 	.then(transform_data)
-	// .then(list_all_products)	/* list all account types in the data set */
-	.then(data=>find_clients_by_product(data, {type: 'SAVINGS'}))
-	// .then(data=>find_clients_by_product(data, {fullName: 'CARDMXAVW'}))	/* Aventura type: MXAVW */
-	// .then(data=>find_clients_by_product(data, {registration: 'TFSA'})) /* find_clients_with_tfsa */
-	// .then(data=>find_clients_by_product(data, {type: 'MORTGAGE'})) /* find_clients_with_mortgage */
-	// .then(data=>find_clients_by_product(data, {type: 'PERSONAL_LINE_CREDIT'})) /* find_clients_with_plc */
-	// .then(data=>find_clients_by_product(data, {type: 'LOAN'})) /* find_clients_with_loan */
+	// .then(list_all_products)
+	// .then(list_all_accounts)
+	// .then(list_accounts_by_product_type)
+	.then(find_clients_with_chequing)
+	// .then(find_clients_with_savings)
+	// .then(find_clients_for_tfsa_withdrawal)
+	// .then(find_clients_for_payment_with_point)
+	// .then(find_clients_with_loan) 
+	// .then(find_clients_with_mortgage) 	
+	// .then(find_clients_with_credit_card) 	
+	// .then(find_clients_with_prepaid_visa)
+	// .then(find_clients_with_plc)
+	// .then(find_clients_with_usd_acct)
 	// .then(find_small_business_clients)
+	// .then(find_clients_not_registered_emt)
 	.then(console.log);
 }
-
 /* TODO
-1. Refactor other find_* functions to use find_clients_by_product?
+1. Refactor other find_* functions to use find_clients_by_product? DONE
 2. Find a way for all find_* functions to return the same data structure, so that I can do 
 	read_data(file).then(transform_data)
 	.then(find something)
 	.then(find something from above results)
 	.then(format final results)
+	==> To do this, each function must check the structure of input before processing
 */
+
+function find_clients_with_plc(data) {
+	return find_clients_by_product(data, {type: 'PERSONAL_LINE_CREDIT'});		
+}
+
+function find_clients_with_prepaid_visa(data) {
+	return find_clients_by_product(data, {type: 'PREPAID_CARD'});		
+}
+
+function find_clients_for_payment_with_point(data) {
+	return marvel_eligible_cards
+	.map( name=> { return { 'type': 'CREDIT_CARD', 'fullName': 'CARD' + name } })
+	.reduce( (bin, product) => bin.concat(find_clients_by_product(data, product)), [] );
+}
+
+function find_clients_for_tfsa_withdrawal(data) {
+	return find_clients_by_product(data, {registration: 'TFSA', type: 'SAVINGS'});		
+}
+
+function find_clients_with_loan(data) {
+	/* Find clients that have loan accounts.
+	Ex: registration: NON_REGISTERED, type: LOAN, code: CL, fullname: CLCL@ */
+	return find_clients_by_product(data, {type: 'LOAN'});
+}
+
+function find_clients_with_mortgage(data) {
+	/* Find clients that have mortgage accounts.
+	Ex: registration: NON_REGISTERED, type: MORTGAGE, code: MTG, fullname: MTGMTG */
+	return find_clients_by_product(data, {type: 'MORTGAGE'});	
+}
+
+function find_clients_with_credit_card(data) {	
+	/* Find clients that have credit cards */
+	return find_clients_by_product(data, {type: 'CREDIT_CARD'});
+}
+
+function find_clients_with_savings(data) {
+	/* Find clients that have savings accounts */
+	return find_clients_by_product(data, {type: 'SAVINGS'});
+}
+
+function find_clients_with_chequing(data) {
+	/* Find clients that have chequing accounts */
+	return find_clients_by_product(data, {type: 'CHEQUING'});
+}
+
+function find_clients_with_usd_acct(data) {
+	/* Find clients that have USD accounts */
+	return list_all_accounts(data)
+	.filter(acct => acct.balance && acct.balance.currency == 'USD');	
+}	
+
+function find_clients_not_registered_emt(data) {
+	/* Find cards that has not been registered for EMT */
+	var emt_register = _.chain(data)
+	.filter( card => _.contains(card.entitlements, 'EMT_REGISTER') )
+	.pluck('card')
+	.value()
+	
+	return emt_register;
+}
+
+function find_small_business_clients(data) {
+	let cards = group_card_by_segments(data);
+	return _.pick(cards, 'SMALL_BUSINESS_SIGNATORY', 'SMALL_BUSINESS_CO_SIGNATORY', 'SMALL_BUSINESS_DELEGATE', 'SMALL_BUSINESS_UNKNOWN');
+}
+
+function find_clients_by_product_2(all_accounts, this_product) {
+	/* this is a memoized version of find_clients_by_product, 
+	for use by list_accounts_by_product_type */
+	return all_accounts.filter(acct => _.isMatch(acct.product, this_product));
+}
+
 
 function find_clients_by_product(data, this_product) {
 	/* this_product must have at least one of {category, registration, type, code, fullName} */
-	let clients_with_this_product = _.chain(data)
-					.map( card => _.chain(card.accounts)
-					.map(account => _.defaults(account, {'accessCard' : card.card, 'clientSegment' : card.segment }))
-					.value() )
-					.flatten()
-					.map(account => _.chain(account)
-						.omit('_type', 'external', 'displayAttributes')
-						.value())
-					.filter(acct => _.isMatch(acct.product, this_product))
-					// .pluck('accessCard')
-					// .uniq()
-					.value();
-	return clients_with_this_product;
+	return list_all_accounts(data).filter(acct => _.isMatch(acct.product, this_product));
 	/* Return:
 		{ id: 'c487bd85d',
 		  number: '6606947601',
@@ -66,169 +137,53 @@ function find_clients_by_product(data, this_product) {
 	*/	
 }
 
-function find_clients_for_payment_with_point(data) {
-	const marvel_eligible_cards = ['MXAVW', 'MXAVW', 'MXAPW', 'MXAPW', 'MCPLP', 'MCPLT', 'MCPLR'].map(name=> 'CARD' + name) ;
-
-	let marvel_cards = _.chain(data)
-					.map( card => _.chain(card.accounts)
-					.map(account => _.defaults(account, {'card' : card.card }))
-					.value() )
-					.flatten()
-					.map(account => _.chain(account)
-						.pick('id', 'card', 'status', 'transit', 'number', 'balance', 'availableFunds' , 'capabilities', 'product')
-						.value())
-					.filter(acct => acct.product.type === 'CREDIT_CARD' )
-					.filter(acct => _.contains(marvel_eligible_cards, acct.product.fullName))
-					.pluck('card')
-					.uniq()
-					.value();
-	return marvel_cards;
-}
-
-function find_small_business_clients(data) {
-	let cards = group_card_by_segments(data);
-	return _.pick(cards, 'SMALL_BUSINESS_SIGNATORY', 'SMALL_BUSINESS_CO_SIGNATORY', 'SMALL_BUSINESS_DELEGATE', 'SMALL_BUSINESS_UNKNOWN');
+function list_accounts_by_product_type(data) {
+	// console.time('list_accounts_by_product_type');
+	
+	let products = list_all_products(data);
+	
+	let product_labels = products.map(t=>_.values(t).join("|"));
+	
+	let all_accounts = list_all_accounts(data);
+	
+	let accounts_by_product = products.map(product => find_clients_by_product_2(all_accounts, product));
+	
+	let output = _.object(product_labels, accounts_by_product);
+	
+	// console.timeEnd('list_accounts_by_product_type');
+	
+	return output;
 }
 
 function list_all_products(data) {	
 	/* List all products that the clients in the data set have */
-	var account_types = _.chain(data)
-	.map( card => _.chain(card.accounts)
-					.map(account => _.defaults(account, {'card' : card.card }))
-					.value() )
-	.flatten()
-	.map(account => 
-		_.chain(account)
-		.defaults({'registration': account.product.registration, 'type': account.product.type, 'code': account.product.code, 'fullName' : account.product.fullName})
-		.pick('registration', 'type', 'code', 'fullName')
-		.values()
-		.join(' ')
-		.value())
-	.uniq()
-	.value();
-	return account_types;
+	let all_types = _.chain(data)
+		.map( card => card.accounts.map(account => account.product) )
+		.flatten()
+		.value();
+	
+	/* filter out duplicate products */
+	return all_types.reduce(
+		function (unique_types, type){
+			if (_.every(unique_types, ut =>_.isMatch(ut,type) == false))
+				unique_types.push(type);
+			return unique_types;
+		}, []);
 }
 
-function find_clients_with_tfsa(data) {
-	/* Find clients that have TFSA accounts.
-	Ex: registration: TFSA, type: SAVINGS, code: TFSADISA, fullName: TFSATFSAD */
-	var tfsa_accts = _.chain(data)
+function list_all_accounts(data) {
+	/* List all accounts. This contains duplicates in cases of 2 access cards sharing the same accounts */
+	let accounts = _.chain(data)
 	.map( card => _.chain(card.accounts)
-					.map(account => _.defaults(account, {'card' : card.card }))
+					.map(account => _.defaults(account, {'accessCard' : card.card, 'clientSegment' : card.segment }))
 					.value() )
 	.flatten()
 	.map(account => _.chain(account)
-		.pick('id', 'card', 'status', 'transit', 'number', 'balance', 'availableFunds' , 'capabilities')
-		.defaults({'registration': account.product.registration, 'type': account.product.type})
-		.value())
-	.filter(acct => acct.registration === 'TFSA')
-	.map(acct => _.pick(acct, 'card', 'transit', 'number', 'type', 'balance'))	
-	.groupBy('card')
-	.value();
-	return tfsa_accts;		
-}
-
-function find_clients_with_loan(data) {
-	/* Find clients that have loan accounts.
-	Ex: registration: NON_REGISTERED, type: LOAN, code: CL, fullname: CLCL@ */
-	var mortgage_accts = _.chain(data)
-	.map( card => _.chain(card.accounts)
-					.map(account => _.defaults(account, {'card' : card.card }))
-					.value() )
-	.flatten()
-	.map(account => _.chain(account)
-		.pick('id', 'card', 'status', 'transit', 'number', 'balance', 'availableFunds' , 'capabilities')
-		.defaults({'registration': account.product.registration, 'type': account.product.type})
-		.value())
-	.filter(acct => acct.type === 'LOAN')
-	.map(acct => _.pick(acct, 'card', 'transit', 'number', 'type', 'balance'))	
-	// .groupBy('card')
-	.value();
-	return mortgage_accts;		
-}
-
-function find_clients_with_mortgage(data) {
-	/* Find clients that have mortgage accounts.
-	Ex: registration: NON_REGISTERED, type: MORTGAGE, code: MTG, fullname: MTGMTG */
-	var mortgage_accts = _.chain(data)
-	.map( card => _.chain(card.accounts)
-					.map(account => _.defaults(account, {'card' : card.card }))
-					.value() )
-	.flatten()
-	.map(account => _.chain(account)
-		.pick('id', 'card', 'status', 'transit', 'number', 'balance', 'availableFunds' , 'capabilities')
-		.defaults({'registration': account.product.registration, 'type': account.product.type})
-		.value())
-	.filter(acct => acct.type === 'MORTGAGE')
-	.map(acct => _.pick(acct, 'card', 'transit', 'number', 'type', 'balance'))	
-	// .groupBy('card')
-	.value();
-	return mortgage_accts;	
-}
-
-function find_clients_with_credit_card(data) {	
-	/* Find clients that have credit cards */
-	var credit_cards = _.chain(data)
-	.map( card => _.chain(card.accounts)
-					.map(account => _.defaults(account, {'card' : card.card }))
-					.value() )
-	.flatten()
-	.map(account => _.chain(account)
-		.pick('id', 'card', 'status', 'transit', 'number', 'balance', 'availableFunds' , 'capabilities', 'product')
-		// .defaults({'registration': account.product.registration, 'type': account.product.type})
-		.value())
-	// .filter( acct => acct.product.type.indexOf('CREDIT') >= 0 ) // matches CREDIT_CARD, PERSONAL_LINE_DREDIT, etc
-	.filter(acct => acct.product.type === 'CREDIT_CARD' ) 
-//	.map(acct => _.pick(acct, 'id', 'card', 'balance'))	
-	.pluck('card')
-	.uniq() /* an access card may be attached to multiple credit cards */
-	.value();
-	return credit_cards;
-}
-
-function find_clients_with_usd_acct(data) {
-	/* Find clients that have USD accounts */
-	var usd_accts = _.chain(data)
-	.map( card => _.chain(card.accounts)
-					.map(account => _.defaults(account, {'card' : card.card }))
-					.value() )
-	.flatten()
-	.map(account => _.chain(account)
-		.pick('id', 'card', 'status', 'transit', 'number', 'balance', 'availableFunds' , 'capabilities')
-		.defaults({'registration': account.product.registration, 'type': account.product.type})
-		.value())
-	.filter(acct => acct.balance && acct.balance.currency === 'USD')
-	.map(acct => _.pick(acct, 'card', 'transit', 'number', 'type', 'balance'))	
-	// .groupBy('card')
-	.value();
-	return usd_accts;
-}	
-
-function list_accounts(data) {
-	/* List all accounts */
-	var accounts = _.chain(data)
-	.map( card => _.chain(card.accounts)
-					.map(account => _.defaults(account, {'card' : card.card }))
-					.value() )
-	.flatten()
-	.map(account => _.chain(account)
-		// .pick('id', 'card', 'status', 'transit', 'number', 'balance', 'availableFunds' , 'capabilities')
-		.pick('card', 'transit', 'number', 'balance' , 'product')
-		// .defaults({'registration': account.product.registration, 'type': account.product.type})
-		.value())
+					.omit('_type', 'external', 'displayAttributes')
+					.value())
 	// .groupBy('card')
 	.value();
 	return accounts;	
-}
-
-function find_not_registered_emt(data) {
-	/* Find cards that has not been registered for EMT */
-	var emt_register = _.chain(data)
-	.filter( card => _.contains(card.entitlements, 'EMT_REGISTER') )
-	.pluck('card')
-	.value();
-	
-	return emt_register;
 }
 
 function list_account_capabilities(data) {
@@ -288,7 +243,7 @@ function group_card_by_segments(data) {
 } 
 
 function read_data(data_file) {
-	return new Promise((resolve, reject)=>{
+	return (new Promise((resolve, reject)=>{
 		fs.readFile(data_file, "utf8",(error, content)=>{
 			if (error) {
 				console.log(error);
@@ -297,11 +252,11 @@ function read_data(data_file) {
 				resolve(content);
 			}
 		});	
-	});
+	}));
 }
 
 function transform_data(data) {
-	return new Promise((resolve, reject)=>{
+	return (new Promise((resolve, reject)=>{
 		var json = JSON.parse(data);
 		var good_cards = _.chain(json)
 		.values() /* keep only values */
@@ -365,11 +320,5 @@ function transform_data(data) {
 				} ]
 			} 
 		*/		
-	});
+	}));
 }
-
-
-
-
-
-
