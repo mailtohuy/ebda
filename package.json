@@ -1,0 +1,23 @@
+{
+  "name": "ebda",
+  "version": "1.0.0",
+  "description": "ebanking data finder",
+  "main": "analyze.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start" : "node analyze.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mailtohuy/ebda.git"
+  },
+  "keywords": [
+    "data"
+  ],
+  "author": "Huy B.",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/mailtohuy/ebda/issues"
+  },
+  "homepage": "https://github.com/mailtohuy/ebda#readme"
+}
