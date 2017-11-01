@@ -3,14 +3,15 @@ const _ = require("underscore");
 var	data_file = "./" + process.argv[2],
 	data; // [ 'card#' : { card: card# , [x-auth-token|error]: ... , data: [ {resp 1}, {resp 2}] } ]
 
-const marvel_eligible_cards = ['MXAVW', 'MXAVW', 'MXAPW', 'MXAPW', 'MCPLP', 'MCPLT', 'MCPLR'];	
-	
-	
-	
+const marvel_eligible_cards = ['MXAVW', 'MXAVW', 'MXAPW', 'MXAPW', 'MCPLP', 'MCPLT', 'MCPLR'];
+const list_all_accounts_memoized = _.memoize(list_all_accounts_internal,
+	data => data[0]['environment'] + data[0]['local-datetime']  )	
+
+
 if (process.argv[2] == undefined) {
 	console.log('Enter a data file');
 	process.exit();
-	
+
 } else {
 	read_data(data_file)
 	.then(transform_data)
@@ -21,9 +22,9 @@ if (process.argv[2] == undefined) {
 	// .then(find_accounts_savings)
 	 .then(find_accounts_for_tfsa_withdrawal)
 	// .then(find_accounts_for_payment_with_point)
-	// .then(find_accounts_loan) 
-	// .then(find_accounts_mortgage) 	
-	// .then(find_accounts_credit_card) 	
+	// .then(find_accounts_loan)
+	// .then(find_accounts_mortgage)
+	// .then(find_accounts_credit_card)
 	// .then(find_accounts_prepaid_visa)
 	// .then(find_accounts_plc)
 	// .then(find_accounts_usd)
@@ -33,7 +34,7 @@ if (process.argv[2] == undefined) {
 }
 /* TODO
 1. Refactor other find_* functions to use find_accounts_by_product? DONE
-2. Find a way for all find_* functions to return the same data structure, so that I can do 
+2. Find a way for all find_* functions to return the same data structure, so that I can do
 	read_data(file).then(transform_data)
 	.then(find something)
 	.then(find something from above results)
@@ -42,11 +43,11 @@ if (process.argv[2] == undefined) {
 */
 
 function find_accounts_plc(data) {
-	return find_accounts_by_product(data, {type: 'PERSONAL_LINE_CREDIT'});		
+	return find_accounts_by_product(data, {type: 'PERSONAL_LINE_CREDIT'});
 }
 
 function find_accounts_prepaid_visa(data) {
-	return find_accounts_by_product(data, {type: 'PREPAID_CARD'});		
+	return find_accounts_by_product(data, {type: 'PREPAID_CARD'});
 }
 
 function find_accounts_for_payment_with_point(data) {
@@ -56,7 +57,7 @@ function find_accounts_for_payment_with_point(data) {
 }
 
 function find_accounts_for_tfsa_withdrawal(data) {
-	return find_accounts_by_product(data, {registration: 'TFSA', type: 'SAVINGS'});		
+	return find_accounts_by_product(data, {registration: 'TFSA', type: 'SAVINGS'});
 }
 
 function find_accounts_loan(data) {
@@ -68,10 +69,10 @@ function find_accounts_loan(data) {
 function find_accounts_mortgage(data) {
 	/* Find clients that have mortgage accounts.
 	Ex: registration: NON_REGISTERED, type: MORTGAGE, code: MTG, fullname: MTGMTG */
-	return find_accounts_by_product(data, {type: 'MORTGAGE'});	
+	return find_accounts_by_product(data, {type: 'MORTGAGE'});
 }
 
-function find_accounts_credit_card(data) {	
+function find_accounts_credit_card(data) {
 	/* Find clients that have credit cards */
 	return find_accounts_by_product(data, {type: 'CREDIT_CARD'});
 }
@@ -89,8 +90,8 @@ function find_accounts_chequing(data) {
 function find_accounts_usd(data) {
 	/* Find clients that have USD accounts */
 	return list_all_accounts(data)
-	.filter(acct => acct.balance && acct.balance.currency == 'USD');	
-}	
+	.filter(acct => acct.balance && acct.balance.currency == 'USD');
+}
 
 function find_clients_small_business(data) {
 	/* Find cards that has not been registered for EMT */
@@ -98,7 +99,7 @@ function find_clients_small_business(data) {
 	.filter( card => _.contains(card.entitlements, 'EMT_REGISTER') )
 	.pluck('card')
 	.value()
-	
+
 	return emt_register;
 }
 
@@ -108,7 +109,7 @@ function find_small_business_clients(data) {
 }
 
 function find_accounts_by_product_2(all_accounts, this_product) {
-	/* this is a memoized version of find_accounts_by_product, 
+	/* this is a memoized version of find_accounts_by_product,
 	for use by list_accounts_by_product_type */
 	return all_accounts.filter(acct => _.isMatch(acct.product, this_product));
 }
@@ -129,39 +130,39 @@ function find_accounts_by_product(data, this_product) {
 		  status: 'ACTIVE',
 		  details: null,
 		  accessCard: '4506445090048743',
-		  clientSegment: 'PERSONAL_BANKING' 
-		  // _type: 'InternalAccount',		  
+		  clientSegment: 'PERSONAL_BANKING'
+		  // _type: 'InternalAccount',
 		  // external: false,
-		  // displayAttributes: null,		  
-		}	
-	*/	
+		  // displayAttributes: null,
+		}
+	*/
 }
 
 function list_accounts_by_product_type(data) {
 	// console.time('list_accounts_by_product_type');
-	
+
 	let products = list_all_products(data);
-	
+
 	let product_labels = products.map(t=>_.values(t).join("|"));
-	
+
 	let all_accounts = list_all_accounts(data);
-	
+
 	let accounts_by_product = products.map(product => find_accounts_by_product_2(all_accounts, product));
-	
+
 	let output = _.object(product_labels, accounts_by_product);
-	
+
 	// console.timeEnd('list_accounts_by_product_type');
-	
+
 	return output;
 }
 
-function list_all_products(data) {	
+function list_all_products(data) {
 	/* List all products that the clients in the data set have */
 	let all_types = _.chain(data)
 		.map( card => card.accounts.map(account => account.product) )
 		.flatten()
 		.value();
-	
+
 	/* filter out duplicate products */
 	return all_types.reduce(
 		function (unique_types, type){
@@ -172,6 +173,10 @@ function list_all_products(data) {
 }
 
 function list_all_accounts(data) {
+	return list_all_accounts_memoized(data);
+}
+
+function list_all_accounts_internal(data) {
 	/* List all accounts. This contains duplicates in cases of 2 access cards sharing the same accounts */
 	let accounts = _.chain(data)
 	.map( card => _.chain(card.accounts)
@@ -183,7 +188,7 @@ function list_all_accounts(data) {
 					.value())
 	// .groupBy('card')
 	.value();
-	return accounts;	
+	return accounts;
 }
 
 function list_account_capabilities(data) {
@@ -195,7 +200,7 @@ function list_account_capabilities(data) {
 	.flatten()
 	.uniq()
 	.value();
-	return capabilities;	
+	return capabilities;
 }
 
 function list_client_features(data) {
@@ -205,7 +210,7 @@ function list_client_features(data) {
 	.flatten()
 	.uniq()
 	.value();
-	
+
 	return clientFeatures;
 }
 
@@ -216,14 +221,14 @@ function list_client_entitlements(data) {
 	.flatten()
 	.uniq()
 	.value();
-	
+
 	return entitlements;
 }
 
 function list_cards_and_segments(data) {
 	var card_segments = _.chain(data)
 	.map(i => _.values(_.pick(i, 'card', 'segment')))
-	.value();	
+	.value();
 	return card_segments;
 }
 
@@ -239,8 +244,8 @@ function group_card_by_segments(data) {
 		return a;
 	}, {})
 	.value();
-	return card_by_types;	
-} 
+	return card_by_types;
+}
 
 function read_data(data_file) {
 	return (new Promise((resolve, reject)=>{
@@ -251,7 +256,7 @@ function read_data(data_file) {
 			} else {
 				resolve(content);
 			}
-		});	
+		});
 	}));
 }
 
@@ -264,7 +269,7 @@ function transform_data(data) {
 		.map(item =>
 			_.chain(item)
 			.pick('card', 'environment', 'local-datetime') /* merge these 3 keys ... */
-			.extend( 
+			.extend(
 				_.chain(item['data']) /* ... with the 'data' key */
 				.map(i=>JSON.parse(i)) /* after parsing & merging the items in 'data' */
 				.reduce((a,b)=>_.extend(a,b), {})
@@ -273,36 +278,36 @@ function transform_data(data) {
 			)
 			.value()
 		)
-		.value();	
-		
+		.value();
+
 		var bad_cards = _.chain(json)
 		.values() /* keep only values */
 		.filter( item => _.has(item, "error") )
 		.pluck('card')
 		.value();
-		
+
 		console.log("Good cards: %d, Bad cards: %d", good_cards.length, bad_cards.length);
 		// console.log("Bad cards:\n%s", bad_cards.join('\n'));
-		
+
 		resolve(good_cards);
-		
-		/* Returns: 
-			{ card: '...' 
+
+		/* Returns:
+			{ card: '...'
 			, environment: '...'
 			, 'local-datetime': '...'
 			, clientFeatures: [...]
 			, entitlements: [...]
 			, segment: '...'
-			, accounts: [ 
+			, accounts: [
 				{ id
-				, transit			
+				, transit
 				, number
 				, status
 				, nickname
 				, capabilities
 				, _type // always 'InternalAcount'
-				, product: 
-					{ category 
+				, product:
+					{ category
 					, registration
 					, type
 					, code
@@ -318,7 +323,7 @@ function transform_data(data) {
 				, displayAttributes
 				, external
 				} ]
-			} 
-		*/		
+			}
+		*/
 	}));
 }
