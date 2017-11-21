@@ -17,22 +17,22 @@ if (process.argv[2] == undefined) {
 	// .then(list_all_products)
 	// .then(list_all_accounts)
 	// .then(list_accounts_by_product_type)
-	.then(find_clients_with_chequing)
-	// .then(find_clients_with_savings)
-	// .then(find_clients_for_tfsa_withdrawal)
-	// .then(find_clients_for_payment_with_point)
-	// .then(find_clients_with_loan) 
-	// .then(find_clients_with_mortgage) 	
-	// .then(find_clients_with_credit_card) 	
-	// .then(find_clients_with_prepaid_visa)
-	// .then(find_clients_with_plc)
-	// .then(find_clients_with_usd_acct)
-	// .then(find_small_business_clients)
+	// .then(find_accounts_chequing)
+	// .then(find_accounts_savings)
+	 .then(find_accounts_for_tfsa_withdrawal)
+	// .then(find_accounts_for_payment_with_point)
+	// .then(find_accounts_loan) 
+	// .then(find_accounts_mortgage) 	
+	// .then(find_accounts_credit_card) 	
+	// .then(find_accounts_prepaid_visa)
+	// .then(find_accounts_plc)
+	// .then(find_accounts_usd)
+	// .then(find_clients_small_business)
 	// .then(find_clients_not_registered_emt)
 	.then(console.log);
 }
 /* TODO
-1. Refactor other find_* functions to use find_clients_by_product? DONE
+1. Refactor other find_* functions to use find_accounts_by_product? DONE
 2. Find a way for all find_* functions to return the same data structure, so that I can do 
 	read_data(file).then(transform_data)
 	.then(find something)
@@ -41,58 +41,58 @@ if (process.argv[2] == undefined) {
 	==> To do this, each function must check the structure of input before processing
 */
 
-function find_clients_with_plc(data) {
-	return find_clients_by_product(data, {type: 'PERSONAL_LINE_CREDIT'});		
+function find_accounts_plc(data) {
+	return find_accounts_by_product(data, {type: 'PERSONAL_LINE_CREDIT'});		
 }
 
-function find_clients_with_prepaid_visa(data) {
-	return find_clients_by_product(data, {type: 'PREPAID_CARD'});		
+function find_accounts_prepaid_visa(data) {
+	return find_accounts_by_product(data, {type: 'PREPAID_CARD'});		
 }
 
-function find_clients_for_payment_with_point(data) {
+function find_accounts_for_payment_with_point(data) {
 	return marvel_eligible_cards
 	.map( name=> { return { 'type': 'CREDIT_CARD', 'fullName': 'CARD' + name } })
-	.reduce( (bin, product) => bin.concat(find_clients_by_product(data, product)), [] );
+	.reduce( (bin, product) => bin.concat(find_accounts_by_product(data, product)), [] );
 }
 
-function find_clients_for_tfsa_withdrawal(data) {
-	return find_clients_by_product(data, {registration: 'TFSA', type: 'SAVINGS'});		
+function find_accounts_for_tfsa_withdrawal(data) {
+	return find_accounts_by_product(data, {registration: 'TFSA', type: 'SAVINGS'});		
 }
 
-function find_clients_with_loan(data) {
+function find_accounts_loan(data) {
 	/* Find clients that have loan accounts.
 	Ex: registration: NON_REGISTERED, type: LOAN, code: CL, fullname: CLCL@ */
-	return find_clients_by_product(data, {type: 'LOAN'});
+	return find_accounts_by_product(data, {type: 'LOAN'});
 }
 
-function find_clients_with_mortgage(data) {
+function find_accounts_mortgage(data) {
 	/* Find clients that have mortgage accounts.
 	Ex: registration: NON_REGISTERED, type: MORTGAGE, code: MTG, fullname: MTGMTG */
-	return find_clients_by_product(data, {type: 'MORTGAGE'});	
+	return find_accounts_by_product(data, {type: 'MORTGAGE'});	
 }
 
-function find_clients_with_credit_card(data) {	
+function find_accounts_credit_card(data) {	
 	/* Find clients that have credit cards */
-	return find_clients_by_product(data, {type: 'CREDIT_CARD'});
+	return find_accounts_by_product(data, {type: 'CREDIT_CARD'});
 }
 
-function find_clients_with_savings(data) {
+function find_accounts_savings(data) {
 	/* Find clients that have savings accounts */
-	return find_clients_by_product(data, {type: 'SAVINGS'});
+	return find_accounts_by_product(data, {type: 'SAVINGS'});
 }
 
-function find_clients_with_chequing(data) {
+function find_accounts_chequing(data) {
 	/* Find clients that have chequing accounts */
-	return find_clients_by_product(data, {type: 'CHEQUING'});
+	return find_accounts_by_product(data, {type: 'CHEQUING'});
 }
 
-function find_clients_with_usd_acct(data) {
+function find_accounts_usd(data) {
 	/* Find clients that have USD accounts */
 	return list_all_accounts(data)
 	.filter(acct => acct.balance && acct.balance.currency == 'USD');	
 }	
 
-function find_clients_not_registered_emt(data) {
+function find_clients_small_business(data) {
 	/* Find cards that has not been registered for EMT */
 	var emt_register = _.chain(data)
 	.filter( card => _.contains(card.entitlements, 'EMT_REGISTER') )
@@ -107,14 +107,14 @@ function find_small_business_clients(data) {
 	return _.pick(cards, 'SMALL_BUSINESS_SIGNATORY', 'SMALL_BUSINESS_CO_SIGNATORY', 'SMALL_BUSINESS_DELEGATE', 'SMALL_BUSINESS_UNKNOWN');
 }
 
-function find_clients_by_product_2(all_accounts, this_product) {
-	/* this is a memoized version of find_clients_by_product, 
+function find_accounts_by_product_2(all_accounts, this_product) {
+	/* this is a memoized version of find_accounts_by_product, 
 	for use by list_accounts_by_product_type */
 	return all_accounts.filter(acct => _.isMatch(acct.product, this_product));
 }
 
 
-function find_clients_by_product(data, this_product) {
+function find_accounts_by_product(data, this_product) {
 	/* this_product must have at least one of {category, registration, type, code, fullName} */
 	return list_all_accounts(data).filter(acct => _.isMatch(acct.product, this_product));
 	/* Return:
@@ -146,7 +146,7 @@ function list_accounts_by_product_type(data) {
 	
 	let all_accounts = list_all_accounts(data);
 	
-	let accounts_by_product = products.map(product => find_clients_by_product_2(all_accounts, product));
+	let accounts_by_product = products.map(product => find_accounts_by_product_2(all_accounts, product));
 	
 	let output = _.object(product_labels, accounts_by_product);
 	
