@@ -23,8 +23,8 @@ function send(environment, command, endpoint, headers, data, session_data){
 		}		
 
 		var post_options = {
-		  //host: environment + '.cibconline.ebank.cibc.com',
-		  host: 'pilot.www.cibconline.cibc.com',
+		  //host: environment + '.simplii.online.com',
+		  host: environment + '.cibconline.ebank.cibc.com',
 		  port: '443',
 		  path: endpoint,
 		  method: command,
@@ -101,8 +101,7 @@ function signOn(environment, cardnumber, session_data) {
 		  encrypted: false,
 		  encrypt: false
 	   },
-	   //password: 'banking'
-	   password: 'BuSyL0G1c'
+	   password: 'banking'
 	});
 	
 	var post_headers = {
