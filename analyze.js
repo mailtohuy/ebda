@@ -5,7 +5,7 @@ var	data_file = "./" + process.argv[2],
 
 const marvel_eligible_cards = ['MXAVW', 'MXAVW', 'MXAPW', 'MXAPW', 'MCPLP', 'MCPLT', 'MCPLR'];
 const list_all_accounts_memoized = _.memoize(list_all_accounts_internal,
-	data => data[0]['environment'] + data[0]['local-datetime']  )	
+	data => data[0]['environment'] + data[0]['local-datetime']  )
 
 
 if (process.argv[2] == undefined) {
@@ -17,10 +17,10 @@ if (process.argv[2] == undefined) {
 	.then(transform_data)
 	// .then(list_all_products)
 	// .then(list_all_accounts)
-	// .then(list_accounts_by_product_type)
+	.then(list_accounts_by_product_type)
 	// .then(find_accounts_chequing)
 	// .then(find_accounts_savings)
-	 .then(find_accounts_for_tfsa_withdrawal)
+	//  .then(find_accounts_for_tfsa_withdrawal)
 	// .then(find_accounts_for_payment_with_point)
 	// .then(find_accounts_loan)
 	// .then(find_accounts_mortgage)
