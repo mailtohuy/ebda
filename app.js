@@ -22,6 +22,11 @@ inquirer.prompt([
     name: 'password',
     mask: '*',
     message: 'Password:'
+  },
+  {
+    type: 'input',
+    name: 'environment',
+    message: 'Environment:'
   }
 ]).then(answers =>{
  console.log(answers);
