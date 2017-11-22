@@ -26,6 +26,14 @@ function getUser(ip) {
   }) || unknownUser);
 }
 
+function addUser(name, ip, role) {
+
+}
+
+function addPermission(role, resource) {
+
+}
+
 function authorize(ip, path) {
   let cache_key = `${ip}${path}`;
   let log_line = `\r\n[${(new Date).toLocaleString()}] ${ip}, ${path}`;
