@@ -1,7 +1,7 @@
 const fs = require('fs'),
        _ = require('lodash');
 
-const authorization = require('./authorization.json');
+const authorization = require('./access.json');
 
 const access_list =
   _.chain(authorization.users)
