@@ -6,7 +6,8 @@ var	data_bank; // A Promise: [ 'card#' : { card: card# , [x-auth-token|error]: .
 
 module.exports =
 {  
-	'init' : load_data,
+	'load' : load,
+	'load_from_file': load_from_file,
 	'chequing' : find_accounts_chequing,
 	'saving' : find_accounts_savings,
 	'tfsa' : find_accounts_for_tfsa_withdrawal,
@@ -48,10 +49,18 @@ function __prettyPrintAccount(accounts) {
 		})
 		.groupBy('accountWithBalance')
 		.map((g,k) => [k, _.chain(g).map(a=>a.accessCard).uniq().value() ])
+		.fromPairs()
 		.value();
 }
 
-function load_data(path_to_data_file) {
+function load(data) {
+	data_bank = transform_data(data);
+}
+
+function load_from_file(path_to_data_file) {
+	if (data_bank != undefined) {
+		return;
+	}
 	data_bank = read_data(path_to_data_file).then(transform_data);  
 }
        
