@@ -1,5 +1,5 @@
-var fs = require("fs");
-var _ = require("underscore");
+var fs = require('fs');
+var _ = require('lodash');
 var report_dir = './report';
 
 fs.readdir(report_dir,(err,files)=>{
@@ -9,7 +9,7 @@ fs.readdir(report_dir,(err,files)=>{
 	
 	var reporters = _.chain(files)
 		.map(file => report_dir + '/' + file)
-		.filter(file => file.endsWith(".txt"))
+		.filter(file => file.endsWith('.txt'))
 		// .tap(console.log)
 		.map(file => read_data(file).then(make_report))
 		.value();
@@ -23,9 +23,9 @@ fs.readdir(report_dir,(err,files)=>{
 		group_by_card = _.groupBy(report, 'card');
 		
 		csv = _.chain(report)
-		.map(row => _.values(row).join(','))
-		.reduce((a,b)=>a +  '\n' + b)
-		.value()
+			.map(row => _.values(row).join(','))
+			.reduce((a,b)=>a +  '\n' + b)
+			.value()
 		;
 		
 		fs.writeFile('./report.csv', csv, (e)=>{});
@@ -35,7 +35,7 @@ fs.readdir(report_dir,(err,files)=>{
 
 function read_data(data_file) {
 	return (new Promise((resolve, reject)=>{
-		fs.readFile(data_file, "utf8",(error, content)=>{
+		fs.readFile(data_file, 'utf8',(error, content)=>{
 			if (error) {
 				console.log(error);
 				reject({});
@@ -52,27 +52,27 @@ function make_report(data) {
 		var json = JSON.parse(data);
 		
 		var report = _.chain(json).values() /* remove the keys */
-		.map(function(item) {
-			var error, message, obj;
+			.map(function(item) {
+				var error, message, obj;
 			
-			obj = _.chain(item)			 
-			.extend({'lastChecked' : item['local-datetime'], 'status' : 'OK'})
+				obj = _.chain(item)			 
+					.extend({'lastChecked' : item['local-datetime'], 'status' : 'OK'})
 
-			if (item['error'] != undefined) {
-				error = JSON.parse(item['error']);
+				if (item['error'] != undefined) {
+					error = JSON.parse(item['error']);
 			
-				if (error['problems']) {
-					message = error['problems'].map(p => p.code).reduce((a,b)=>a+','+b);
-				} else {
-					message = 'other error';
-				}
+					if (error['problems']) {
+						message = error['problems'].map(p => p.code).reduce((a,b)=>a+','+b);
+					} else {
+						message = 'other error';
+					}
 				
-				item['status'] = message;
-			}
+					item['status'] = message;
+				}
 
-			return obj.pick('card', 'environment', 'lastChecked', 'status').value();
-		})
-		.value();	
+				return obj.pick('card', 'environment', 'lastChecked', 'status').value();
+			})
+			.value();	
 		
 		resolve(report);
 
