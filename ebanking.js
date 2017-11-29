@@ -1,5 +1,28 @@
 const https = require('https');
 
+function request_promise(host, method, port, endpoint, headers, payload) {
+	return new Promise(function(resolve, reject) {
+		let options = {
+					'host': host,
+					'port': port || 443,
+					'path': endpoint || '/',
+					'method': method || 'GET',
+					'headers': headers || {}
+				};
+		
+		let request = https.request(options, function(response) {
+			let data = [];
+			response.on('data', (chunk) => data.push(chunk));
+			response.on('end', () => resolve( [ response.statusCode, response.headers, data ] ));
+		});
+
+		request.on('error', (err) => reject(err));
+		request.write(payload || '');
+		request.end();
+
+	})
+}
+
 function send(environment, command, endpoint, headers, data, session_data){
 	return new Promise((resolve, reject) => {
 		var post_headers = {
