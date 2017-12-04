@@ -4,12 +4,14 @@ const
   
 var	data_bank; // A Promise: [ 'card#' : { card: card# , [x-auth-token|error]: ... , data: [ {resp 1}, {resp 2}] } ]
 
+// load_from_file('./data/sit28_cibc.json').then(find_accounts_plc).then(console.log);
+
 module.exports =
 {  
-	'load' : load,
+	'load_from_raw_data' : load_from_raw_data,
 	'load_from_file': load_from_file,
-	'chequing' : find_accounts_chequing,
-	'saving' : find_accounts_savings,
+	'cheq' : find_accounts_chequing,
+	'sav' : find_accounts_savings,
 	'tfsa' : find_accounts_for_tfsa_withdrawal,
 	'aventura' : find_accounts_for_payment_with_point,
 	'loan': find_accounts_loan,
@@ -53,15 +55,18 @@ function __prettyPrintAccount(accounts) {
 		.value();
 }
 
-function load(data) {
-	data_bank = transform_data(data);
+function load_from_raw_data(raw_data) {
+	return transform_data(raw_data).then(transformed_data => {
+		data_bank = Promise.resolve(transformed_data);
+		return data_bank;
+	});
 }
 
 function load_from_file(path_to_data_file) {
-	if (data_bank != undefined) {
-		return;
-	}
-	data_bank = read_data(path_to_data_file).then(transform_data);  
+	return read_data(path_to_data_file).then(transform_data).then(transformed_data => {
+		data_bank = Promise.resolve(transformed_data);
+		return data_bank;
+	});
 }
        
 /* TODO
@@ -75,6 +80,7 @@ function load_from_file(path_to_data_file) {
 */
 
 function find_accounts_plc() {
+	debugger;
 	return data_bank.then(data => 
 		__find_accounts_by_product(data, {type: 'PERSONAL_LINE_CREDIT'})
 	).then(__prettyPrintAccount);		
@@ -239,6 +245,7 @@ function find_accounts_by_product_2(all_accounts, this_product) {
 
 
 function __find_accounts_by_product(data, this_product) {
+	debugger;
 	/* this_product must have at least one of {category, registration, type, code, fullName} */
 	return list_all_accounts(data).filter(acct => _.isMatch(acct.product, this_product));
 	/* Return:
@@ -404,7 +411,15 @@ function read_data(data_file) {
 
 function transform_data(data) {
 	return (new Promise((resolve, reject)=>{
-		let json = JSON.parse(data);
+
+		let json = '';
+		
+		try {
+			json = JSON.parse(data);	
+		} catch (error) {
+			reject(error);
+		}
+		
 		let good_cards = _.chain(json)
 			.values() /* keep only values */
 			.reject( item => _.has(item, 'error') ) /* remove items with error */
@@ -430,7 +445,6 @@ function transform_data(data) {
     
 		// console.log('Good cards: %d, Bad cards: %d', good_cards.length, bad_cards.length);
 		// console.log("Bad cards:\n%s", bad_cards.join('\n'));
-    
 		resolve(good_cards);
     
 		/* Returns: 
