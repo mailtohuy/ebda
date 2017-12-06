@@ -4,11 +4,10 @@ const
   
 var	data_bank; // A Promise: [ 'card#' : { card: card# , [x-auth-token|error]: ... , data: [ {resp 1}, {resp 2}] } ]
 
-// load_from_file('./data/sit28_cibc.json').then(find_accounts_plc).then(console.log);
+// load_from_file('./sit7_12_5_2017__3_20_28_PM.json').then(find_accounts_plc).then(console.log);
 
 module.exports =
 {  
-	'load_from_raw_data' : load_from_raw_data,
 	'load_from_file': load_from_file,
 	'cheq' : find_accounts_chequing,
 	'sav' : find_accounts_savings,
@@ -22,15 +21,16 @@ module.exports =
 	'usd' : find_accounts_usd,
 	'usd_visa' : find_accounts_usd_visa,
 	'sbs' : find_clients_small_business_signatory,
-	'sbc' : find_clients_small_business_cosignatory,	
-	'sbd' : find_clients_small_business_delegate,	
-	'sbu' : find_clients_small_business_unknown,			
+	'sbc' : find_clients_small_business_cosignatory,
+	'sbd' : find_clients_small_business_delegate,
+	'sbu' : find_clients_small_business_unknown,
 	'pb' : find_clients_personal_banking ,
 	'pwm' : find_clients_private_wealth ,
 	'is' : find_clients_imperial_service ,
 	'cco' : find_clients_credit_only ,
 	'non_emt' : find_clients_not_registered_emt,
-	'emt' : find_clients_registered_emt
+	'emt' : find_clients_registered_emt,
+	'bad' : list_bad_cards
 };
 
 function __prettyPrintAccount(accounts) {
@@ -55,29 +55,56 @@ function __prettyPrintAccount(accounts) {
 		.value();
 }
 
-function load_from_raw_data(raw_data) {
-	return transform_data(raw_data).then(transformed_data => {
-		data_bank = Promise.resolve(transformed_data);
-		return data_bank;
-	});
-}
-
 function load_from_file(path_to_data_file) {
-	return read_data(path_to_data_file).then(transform_data).then(transformed_data => {
-		data_bank = Promise.resolve(transformed_data);
-		return data_bank;
+	
+/** Expected input file format: 
+			{ card: { card: '...' 
+			, 'x-auth-token' : '...'
+      , environment: '...'
+      , 'local-datetime': '...'
+      , clientFeatures: [...]
+      , entitlements: [...]
+      , segment: '...'
+      , accounts: [ 
+        { id
+        , transit			
+        , number
+        , status
+        , nickname
+        , capabilities
+        , _type // always 'InternalAcount'
+        , product: 
+          { category 
+          , registration
+          , type
+          , code
+          , name
+          , fullName
+          , bankDesignation
+          }
+        , availableFunds:
+          { currency
+          , amount
+          }
+        , details
+        , displayAttributes
+        , external
+        } ]
+      } }
+*/
+	return new Promise( (resolve, reject) => {
+		let data = [];
+		
+		try {
+			data = require(path_to_data_file);
+		} catch (error) {
+			reject(err);
+		}
+		
+		data_bank = Promise.resolve(_.values(data));
+		resolve( data_bank );
 	});
 }
-       
-/* TODO
-1. Refactor other find_* functions to use find_accounts_by_product? DONE
-2. Find a way for all find_* functions to return the same data structure, so that I can do 
-  read_data(file).then(transform_data)
-  .then(find something)
-  .then(find something from above results)
-  .then(format final results)
-  ==> To do this, each function must check the structure of input before processing
-*/
 
 function find_accounts_plc() {
 	debugger;
@@ -237,18 +264,21 @@ function find_clients_credit_only() {
 	});
 }
 
-function find_accounts_by_product_2(all_accounts, this_product) {
-	/* this is a memoized version of find_accounts_by_product, 
-  for use by list_accounts_by_product_type */
-	return all_accounts.filter(acct => _.isMatch(acct.product, this_product));
+function list_bad_cards() {
+	return data_bank.then(data => {
+		let bad_cards = _.chain(data)
+			.filter( item => _.has(item, 'error') )
+			.map(item => _.pick(item, 'card', 'error'))
+			.groupBy('error')
+			.map((group, key) => [key, _.chain(group).map(card => card.card).value()])
+			.value();	
+		return bad_cards;
+	});
 }
 
-
 function __find_accounts_by_product(data, this_product) {
-	debugger;
-	/* this_product must have at least one of {category, registration, type, code, fullName} */
-	return list_all_accounts(data).filter(acct => _.isMatch(acct.product, this_product));
-	/* Return:
+	/* this_product must have at least one of {category, registration, type, code, fullName}
+	 	Return:
     { id: 'c487bd85d',
       number: '6606947601',
       nickname: '',
@@ -261,23 +291,24 @@ function __find_accounts_by_product(data, this_product) {
       details: null,
       accessCard: '4506445090048743',
       clientSegment: 'PERSONAL_BANKING' 
-      // _type: 'InternalAccount',		  
+      // _type: 'InternalAccount',
       // external: false,
-      // displayAttributes: null,		  
+      // displayAttributes: null,
     }	
-  */	
+	*/
+	debugger;	
+	return list_all_accounts(data).filter(acct => _.isMatch(acct.product, this_product));
 }
 
 function list_accounts_by_product_type(data) {
-	// console.time('list_accounts_by_product_type');
   
 	let products = list_all_products(data);
   
 	let product_labels = products.map(t=>_.values(t).join('|'));
   
 	let all_accounts = list_all_accounts(data);
-  
-	let accounts_by_product = products.map(product => find_accounts_by_product_2(all_accounts, product));
+
+	let accounts_by_product = products.map(product => all_accounts.filter(acct => _.isMatch(acct.product, product)));
   
 	let output = _.object(product_labels, accounts_by_product);
   
@@ -303,12 +334,12 @@ function list_all_products(data) {
 		}, []);
 }
 
-const list_all_accounts_memoized = 
-	_.memoize( list_all_accounts_internal, data => data[0]['environment'] + data[0]['local-datetime']);
-
 function list_all_accounts(data) {
 	return list_all_accounts_memoized(data);
 }
+
+const list_all_accounts_memoized = 
+	_.memoize( list_all_accounts_internal, data => data[0]['environment'] + data[0]['local-datetime']);
 
 function list_all_accounts_internal(data) {
 	/* List all accounts. This contains duplicates in cases of 2 access cards sharing the same accounts */
@@ -379,107 +410,4 @@ function group_card_by_segments(data) {
 		}, {})
 		.value();
 	return card_by_types;	
-} 
-
-
-function get_bad_cards() {
-	return new Promise((resolve,reject) =>{
-		// let json = JSON.parse(data);
-		let bad_cards = _.chain(data_bank)
-			.values() /* keep only values */
-			.filter( item => _.has(item, 'error') && item['error'].indexOf('No PVQs') > 0 )
-			.map('card') // .pluck() in underscorce
-			.value();	
-
-		resolve(bad_cards);
-	});
-}
-
-function read_data(data_file) {
-	return new Promise((resolve, reject)=>{
-		fs.readFile(data_file, 'utf8',(error, content)=>{
-			if (error) {
-				console.error(error);
-				reject({});
-			} else {
-				resolve(content);
-			}
-		});	
-	})  ;
-}
-
-
-function transform_data(data) {
-	return (new Promise((resolve, reject)=>{
-
-		let json = '';
-		
-		try {
-			json = JSON.parse(data);	
-		} catch (error) {
-			reject(error);
-		}
-		
-		let good_cards = _.chain(json)
-			.values() /* keep only values */
-			.reject( item => _.has(item, 'error') ) /* remove items with error */
-			.map(item =>
-				_.chain(item)
-					.pick('card', 'environment', 'local-datetime') /* merge these 3 keys ... */
-					.extend( 
-						_.chain(item['data']) /* ... with the 'data' key */
-							.map(i=>JSON.parse(i)) /* after parsing & merging the items in 'data' */
-							.reduce((a,b)=>_.extend(a,b), {})
-							.omit('meta', 'lastSignOn', 'cciRequired') /* and removing these keys */
-							.value()
-					)
-					.value()
-			)
-			.value();	
-    
-		let bad_cards = _.chain(json)
-			.values() /* keep only values */
-			.filter( item => _.has(item, 'error') )
-			.map('card') // .pluck() in underscorce
-			.value();
-    
-		// console.log('Good cards: %d, Bad cards: %d', good_cards.length, bad_cards.length);
-		// console.log("Bad cards:\n%s", bad_cards.join('\n'));
-		resolve(good_cards);
-    
-		/* Returns: 
-      [ { card: '...' 
-      , environment: '...'
-      , 'local-datetime': '...'
-      , clientFeatures: [...]
-      , entitlements: [...]
-      , segment: '...'
-      , accounts: [ 
-        { id
-        , transit			
-        , number
-        , status
-        , nickname
-        , capabilities
-        , _type // always 'InternalAcount'
-        , product: 
-          { category 
-          , registration
-          , type
-          , code
-          , name
-          , fullName
-          , bankDesignation
-          }
-        , availableFunds:
-          { currency
-          , amount
-          }
-        , details
-        , displayAttributes
-        , external
-        } ]
-      } ]
-    */		
-	}));
 }
