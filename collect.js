@@ -3,11 +3,13 @@ const
 	_ = require('lodash'),
 	fs = require('fs');
 
+module.exports = {
+	'get': read_cards,
+	'fetch_data': fetch_data
+};	
 
 if ((process.argv[2] == undefined) || (process.argv[3] == undefined)) {
 	console.log('node collect.js <card_file> <environment>\n');
-	process.exit();
-
 } else {
 	var
 		card_file = process.argv[2],
@@ -19,35 +21,22 @@ if ((process.argv[2] == undefined) || (process.argv[3] == undefined)) {
 		.then(data => save_to_file(file_name, JSON.stringify(data)));
 }
 
-function __extractErrorMessage(error_obj) {
-	var message;
+function signOnAndGetAccounts(session) {
 
-	if (error_obj['problems']) {
-		message = error_obj['problems']
-			.map(p => p.code + (p.details.message ? ' ' + p.details.message : ''))
-			.reduce((a, b) => a + ',' + b);
-	} else if (error_obj['transactionId']) {
-		message = 'needs OTVC';
-	} else {
-		message = JSON.stringify(error_obj);
-	}
-
-	return message;
-}
-
-function __signOnAndGetAccounts(environment, card, session_data) {
-
-	return eb.signOn(environment, card, session_data)
+	return eb.signOn(session)
 		.then(eb.getAccounts)
+		.then(eb.getEMTRecipients)
+		.then(eb.getBillPayees)
 		.then(eb.signOff)
-		.then(session_data => {
-			console.log('%s: done!', session_data['card']);
-			return session_data;
-		})
-		.catch(function (session_data) {
-			var error = JSON.parse(session_data['error']),
-				message = __extractErrorMessage(error);
-			console.log('%s: %s!', session_data['card'], message);
+		.then(returned_session => {
+
+			if (returned_session['error'] == undefined) {
+				console.log('%s: done!', returned_session['card']);	
+			} else {
+				console.log('%s: %s', returned_session['card'], returned_session['error']);
+			}
+
+			return returned_session;
 		});
 }
 
@@ -57,11 +46,12 @@ function fetch_data(cards) {
 
 	/* initialize the sessions */
 	cards.map(card => sessions[card] = {
-		'card': card
+		'card': card,
+		'environment' : environment
 	});
 
 	/* run sequentially -> no 0001 errors */
-	return cards.map(card => () => __signOnAndGetAccounts(environment, card, sessions[card]))
+	return cards.map(card => () => signOnAndGetAccounts(sessions[card]))
 		.reduce(
 			(resultBin, aRequest) =>
 				resultBin.then(result => aRequest().then(Array.prototype.concat.bind(result))), Promise.resolve([])
@@ -88,12 +78,9 @@ function read_cards(data_file) {
 				// console.log(error);
 				reject(error);
 			} else {
-
-				cards = _.chain(content.split('\r\n'))
-					.map(chunk => chunk.split('\n'))
-					.flatten()
-					.map(chunk => chunk.trim())
-					.reject(chunk => (chunk.length == 0) || (chunk.startsWith('/')))
+				cards = _.chain(content.match(/([\/]{0,2}\d[ -]*){16}/g))
+					.reject(card =>card.startsWith('/'))
+					.map(card => card.replace(/[ -]/g, ''))
 					.uniq()
 					.value();
 				resolve(cards);
@@ -102,7 +89,3 @@ function read_cards(data_file) {
 	}));
 }
 
-module.exports = {
-	'read_cards': read_cards,
-	'fetch_data': fetch_data
-};
