@@ -1,9 +1,11 @@
 const 
 	https = require('https'),
-	http =  require('http');
+	http =  require('http'),
+	fs = require('fs') ;
 
 module.exports = {
-	'send_http_request' : request_promise
+	'send_http_request' : request_promise,
+	'log' : write_log
 };
 
 function request_promise(host, method, port, endpoint, headers, payload) {
@@ -43,9 +45,19 @@ function request_promise(host, method, port, endpoint, headers, payload) {
 			// debugger;
 			resolve( failure );
 		});
-    
-		req.write(payload || '');
+		if (method != 'GET')
+			req.write(payload);
 		req.end();
 
+	});
+}
+
+function write_log(level, content) {
+	let text = content;
+	if (typeof content === 'object') {
+		text = JSON.stringify(content);
+	}
+	fs.appendFile('./eblog.txt', `\n[${level}] ${(new Date).toISOString()}\n${text}`, (err) => {
+		if (err) throw err;
 	});
 }

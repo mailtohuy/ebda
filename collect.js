@@ -21,12 +21,13 @@ if ((process.argv[2] == undefined) || (process.argv[3] == undefined)) {
 		.then(data => save_to_file(file_name, JSON.stringify(data)));
 }
 
-function signOnAndGetAccounts(session) {
+function getAllCardInfo(session) {
 
 	return eb.signOn(session)
+		.then(eb.getUserProfile)	
 		.then(eb.getAccounts)
-		.then(eb.getEMTRecipients)
 		.then(eb.getBillPayees)
+		.then(eb.getDirectDepositRegistrations)
 		.then(eb.signOff)
 		.then(returned_session => {
 
@@ -51,7 +52,7 @@ function fetch_data(cards) {
 	});
 
 	/* run sequentially -> no 0001 errors */
-	return cards.map(card => () => signOnAndGetAccounts(sessions[card]))
+	return cards.map(card => () => getAllCardInfo(sessions[card]))
 		.reduce(
 			(resultBin, aRequest) =>
 				resultBin.then(result => aRequest().then(Array.prototype.concat.bind(result))), Promise.resolve([])

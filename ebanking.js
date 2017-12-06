@@ -6,8 +6,9 @@ module.exports = {
 	'signOn': signOn,
 	'getAccounts': getAccounts,
 	'signOff': signOff,
-	'getEMTRecipients' : getEMTRecipients,
-	'getBillPayees' :getBillPayees
+	'getUserProfile' : getUserProfile,
+	'getBillPayees' : getBillPayees,
+	'getDirectDepositRegistrations' : getDirectDepositRegistrations
 };
 
 function __extractErrorMessage(error_obj) {
@@ -50,8 +51,8 @@ function send_ebanking_request(command, endpoint, headers, data, session) {
 		'Content-Type': 'application/json',
 		'Accept': 'application/json',
 		'brand': isSimplii ? 'pcf' : 'cibc',
-		'Client-Type': 'MOBILE_IPHONE',
-		'Content-Length': Buffer.byteLength(__data)
+		'Client-Type': 'MOBILE_IPHONE'
+		// 'Content-Length': Buffer.byteLength(__data)
 	};
 
 	// copy the parameter 'headers' into _headers
@@ -62,16 +63,16 @@ function send_ebanking_request(command, endpoint, headers, data, session) {
 	if (session['x-auth-token']) {
 		__headers['x-auth-token'] = session['x-auth-token'];
 	}
-
+	
 	// send request and try to transform the response into JSON
 	// debugger;
+	utils.log('REQUEST', {'host':host, 'command': command, 'endpoint': endpoint, 'headers': __headers, 'payload' : __data});
 	return utils.send_http_request(host, command, 443, endpoint, __headers, __data)
 		.then(response => {
 
 			/* if the request has response from ebanking server */
 			if (response['data'] != undefined) {
-				let json = {};
-
+				utils.log('RESPONSE', response);
 				try {
 					response.data = JSON.parse(response.data);
 				} catch (err) {
@@ -102,7 +103,7 @@ function signOn(session) {
 	let post_headers = {
 		'WWW-Authenticate': 'CardAndPassword'
 	};
-
+	utils.log('-----------------------------------------SESSION START-----------------------------------------', '');
 	return send_ebanking_request('POST', '/ebm-anp/api/v1/json/sessions', post_headers, post_data, session)
 		.then(response => {
 			debugger;
@@ -171,6 +172,28 @@ function signOff(session) {
 		});
 }
 
+function getUserProfile(session) {
+	if (session['x-auth-token'] == undefined) {
+		return session;
+	}
+
+	return send_ebanking_request('GET', '/ebm-anp/api/v1/profile/json/userProfiles', {}, '', session)
+		.then(response => {
+
+			if (response.status != 200) {
+				console.log(response);
+			}			
+
+			if (response.status == 200) {
+				try {
+					session['user'] = response.data;
+				} catch (error) {
+					//do something
+				} 
+			}
+			return session;
+		});
+}
 
 function getBillPayees(session) {
 	if (session['x-auth-token'] == undefined) {
@@ -196,46 +219,21 @@ function getBillPayees(session) {
 		});
 }
 
-function getEMTRecipients(session) {
+function getDirectDepositRegistrations(session) {
 	if (session['x-auth-token'] == undefined) {
 		return session;
 	}
 
-	return send_ebanking_request('GET', 'ebm-mm/api/v1.30/json/recipients', {}, '', session)
+	return send_ebanking_request('GET', '/ebm-mm/api/v1.30/json/directDepositRegistrations', {}, '', session)
 		.then(response => {
 
 			if (response.status != 200) {
-				console.log(session['x-auth-token']);
-				console.log(response);
-			}
-
-			if (response.status == 200) {
-				try {
-					session['recipients'] = response.data;
-				} catch (error) {
-					//do something
-				} 
-			}
-			return session;
-		});
-}
-
-function getEMTProfiles(session) {
-	if (session['x-auth-token'] == undefined) {
-		return session;
-	}
-
-	return send_ebanking_request('GET', 'ebm-mm/api/v1.30/json/emtProfiles', {}, '', session)
-		.then(response => {
-
-			if (response.status != 200) {
-				console.log(session['x-auth-token']);
-				console.log(response);
+				//do something
 			}			
 
 			if (response.status == 200) {
 				try {
-					session['emtProfiles'] = response.data;
+					session['directDepositRegistrations'] = response.data['directDepositRegistrations'];
 				} catch (error) {
 					//do something
 				} 
@@ -244,20 +242,68 @@ function getEMTProfiles(session) {
 		});
 }
 
-function getAccountTransactionHistory(accountId, fromDate, toDate, session) {
-	/* check prerequisite */
-	if (session['accounts'] == undefined) {
-		// console.log('getAccountTransactionHistory - session has no account');
-		return session;
-	}
 
-	let endpoint = `/ebm-ai/api/v1/json/transactions?accountId=${accountId}&fromDate=${fromDate}&toDate=${toDate}&limit=100&offset=0`;
-	/* send ebanking request */
-	return send_ebanking_request('GET', endpoint, {}, '', session)
-		.then(response => {
-			/* process response, report error or add stuff to session */
-			//do stuff
-			/* lastly, must return session so the then() chain is not broken */
-			return session;
-		});
-}
+// function getEMTRecipients(session) {
+// 	if (session['x-auth-token'] == undefined) {
+// 		return session;
+// 	}
+
+// 	return send_ebanking_request('GET', 'ebm-mm/api/v1/json/recipients', {}, '', session)
+// 		.then(response => {
+
+// 			if (response.status != 200) {
+// 				//do something
+// 			}
+
+// 			if (response.status == 200) {
+// 				try {
+// 					session['recipients'] = response.data;
+// 				} catch (error) {
+// 					//do something
+// 				} 
+// 			}
+// 			return session;
+// 		});
+// }
+
+// function getEMTProfiles(session) {
+// 	if (session['x-auth-token'] == undefined) {
+// 		return session;
+// 	}
+
+// 	return send_ebanking_request('GET', 'ebm-mm/api/v1.30/json/emtProfiles', {}, '', session)
+// 		.then(response => {
+
+// 			if (response.status != 200) {
+// 				console.log(session['x-auth-token']);
+// 				console.log(response);
+// 			}			
+
+// 			if (response.status == 200) {
+// 				try {
+// 					session['emtProfiles'] = response.data;
+// 				} catch (error) {
+// 					//do something
+// 				} 
+// 			}
+// 			return session;
+// 		});
+// }
+
+// function getAccountTransactionHistory(accountId, fromDate, toDate, session) {
+// 	/* check prerequisite */
+// 	if (session['accounts'] == undefined) {
+// 		// console.log('getAccountTransactionHistory - session has no account');
+// 		return session;
+// 	}
+
+// 	let endpoint = `/ebm-ai/api/v1/json/transactions?accountId=${accountId}&fromDate=${fromDate}&toDate=${toDate}&limit=100&offset=0`;
+// 	/* send ebanking request */
+// 	return send_ebanking_request('GET', endpoint, {}, '', session)
+// 		.then(response => {
+// 			/* process response, report error or add stuff to session */
+// 			//do stuff
+// 			/* lastly, must return session so the then() chain is not broken */
+// 			return session;
+// 		});
+// }
